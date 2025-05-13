@@ -17,7 +17,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
 
-    if: github.event_name == 'push' && github.ref_type == 'tag' && github.base_ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref_type == 'tag'
     
     steps:
       - name: Checkout code
