@@ -17,33 +17,33 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v2
 
       - name: Set up CMake
-        uses: lukka/get-cmake@v3
+        uses: actions/setup-cmake@v2  # 也可以尝试使用 actions/setup-cmake@v1
 
       - name: Install dependencies (Ubuntu)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y build-essential
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential
 
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
-        run: choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System'
+        run: |
+          choco install cmake
+          choco install visualstudio2019buildtools
 
-      - name: Install dependencies (macOS)
+      - name: Install dependencies (MacOS)
         if: runner.os == 'macOS'
-        run: brew install cmake
+        run: |
+          brew install cmake
 
-      - name: Configure project
-        run: cmake -S . -B build
+      - name: Configure and build
+        run: |
+          cmake .
+          cmake --build .
 
-      - name: Build project
-        run: cmake --build build
-
-      - name: Run tests (Linux & macOS)
-        if: runner.os != 'Windows'
-        run: ./build/MyCppProject || echo "No executable to run"
-
-      - name: Run tests (Windows)
-        if: runner.os == 'Windows'
-        run: .\build\MyCppProject.exe || echo "No executable to run"
+      - name: Run tests
+        run: |
+          ./MyCppProject
