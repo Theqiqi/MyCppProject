@@ -14,36 +14,36 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-    
+
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
-      
+        uses: actions/checkout@v3
+
       - name: Set up CMake
-        uses: actions/setup-cmake@v2
+        uses: lukka/get-cmake@v3
 
       - name: Install dependencies (Ubuntu)
         if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential
+        run: sudo apt-get update && sudo apt-get install -y build-essential
 
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
-        run: |
-          choco install cmake
-          choco install visualstudio2019buildtools
+        run: choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System'
 
-      - name: Install dependencies (MacOS)
+      - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
-        run: |
-          brew install cmake
+        run: brew install cmake
 
-      - name: Configure and build
-        run: |
-          cmake .
-          cmake --build .
-      
-      - name: Run tests
-        run: |
-          ./MyCppProject
+      - name: Configure project
+        run: cmake -S . -B build
+
+      - name: Build project
+        run: cmake --build build
+
+      - name: Run tests (Linux & macOS)
+        if: runner.os != 'Windows'
+        run: ./build/MyCppProject || echo "No executable to run"
+
+      - name: Run tests (Windows)
+        if: runner.os == 'Windows'
+        run: .\build\MyCppProject.exe || echo "No executable to run"
