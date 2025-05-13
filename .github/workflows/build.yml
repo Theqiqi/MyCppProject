@@ -77,14 +77,14 @@ jobs:
       # Step: Upload to GitHub Release
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        if: github.event_name == 'push' && github.ref_type == 'tag'
         with:
           tag_name: "release-${{ github.sha }}"   # ✅ 就是这里！
           name: "Auto Release Build ${{ github.run_number }}"
           draft: false
           prerelease: false
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.MY_PERSONAL_ACCESS_TOKEN }}
 
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v1
