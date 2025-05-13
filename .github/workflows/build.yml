@@ -16,9 +16,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-
-    if: github.event_name == 'push' && github.ref_type == 'tag'
-    
+        if: github.event_name == 'push' && github.ref_type == 'tag'
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -78,9 +76,9 @@ jobs:
       # Step: Upload to GitHub Release
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
-        if: github.ref_type == 'tag' && github.base_ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         with:
-          tag_name: "${{ github.ref }}"
+          tag_name: "release-${{ github.sha }}"   # ✅ 就是这里！
           name: "Auto Release Build ${{ github.run_number }}"
           draft: false
           prerelease: false
@@ -93,3 +91,4 @@ jobs:
           files: dist.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
