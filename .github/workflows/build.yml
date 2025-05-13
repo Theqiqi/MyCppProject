@@ -19,31 +19,44 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Set up CMake
-        uses: actions/setup-cmake@v3  # Use v3 instead of v2
-
-      - name: Install dependencies (Ubuntu)
+      # Set up CMake for Ubuntu
+      - name: Install CMake (Ubuntu)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential
+          sudo apt-get install -y cmake build-essential
 
-      - name: Install dependencies (Windows)
+      # Set up CMake for Windows
+      - name: Install CMake (Windows)
         if: runner.os == 'Windows'
         run: |
           choco install cmake
           choco install visualstudio2019buildtools
 
-      - name: Install dependencies (MacOS)
+      # Set up CMake for macOS
+      - name: Install CMake (macOS)
         if: runner.os == 'macOS'
         run: |
           brew install cmake
 
+      # Configure and build the project
       - name: Configure and build
         run: |
           cmake .
           cmake --build .
-      
-      - name: Run tests
+
+      # Run tests (if applicable)
+      - name: Run tests (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          ./MyCppProject
+
+      - name: Run tests (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          .\MyCppProject.exe
+
+      - name: Run tests (macOS)
+        if: runner.os == 'macOS'
         run: |
           ./MyCppProject
