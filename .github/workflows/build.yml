@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    tags:
+      - 'v*'  # ✅ 仅在 `main` 分支且 `v*` 版本标签推送时触发
   pull_request:
     branches:
       - main
@@ -14,6 +16,8 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+
+    if: github.event_name == 'push' && github.ref_type == 'tag' && github.base_ref == 'refs/heads/main'
     
     steps:
       - name: Checkout code
@@ -52,3 +56,40 @@ jobs:
       - name: Run tests (Windows)
         if: runner.os == 'Windows'
         run: .\build\Release\MyCppProject.exe
+      
+      # Step: Archive the executable (all platforms)
+      - name: Package executable
+        run: |
+          mkdir -p dist
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            cp ./build/MyCppProject ./dist/MyCppProject_Linux
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            cp ./build/MyCppProject ./dist/MyCppProject_macOS
+          elif [ "$RUNNER_OS" == "Windows" ]; then
+            cp .\build\Release\MyCppProject.exe .\dist\MyCppProject_Windows.exe
+          fi
+      - name: Compress artifacts
+        if: runner.os != 'Windows'
+        run: zip -j dist.zip dist/*
+      - name: Compress artifacts (Windows)
+        if: runner.os == 'Windows'
+        run: powershell Compress-Archive -Path dist\* -DestinationPath dist.zip
+
+      # Step: Upload to GitHub Release
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        if: github.ref_type == 'tag' && github.base_ref == 'refs/heads/main'
+        with:
+          tag_name: "${{ github.ref }}"
+          name: "Auto Release Build ${{ github.run_number }}"
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
