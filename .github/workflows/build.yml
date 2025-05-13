@@ -14,13 +14,19 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+<<<<<<< HEAD
 
       - name: Set up CMake
         uses: actions/setup-cmake@v2  # 也可以尝试使用 actions/setup-cmake@v1
+=======
+      
+      - name: Set up CMake
+        uses: actions/setup-cmake@v2   # 直接使用这个行来安装 CMake
+>>>>>>> main
 
       - name: Install dependencies (Ubuntu)
         if: runner.os == 'Linux'
@@ -43,7 +49,11 @@ jobs:
         run: |
           cmake .
           cmake --build .
+<<<<<<< HEAD
 
+=======
+      
+>>>>>>> main
       - name: Run tests
         run: |
           ./MyCppProject
