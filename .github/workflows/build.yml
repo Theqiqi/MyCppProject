@@ -5,7 +5,7 @@ on:
     branches:
       - main
     tags:
-      - 'v*'  # ✅ 仅在 `main` 分支且 `v*` 版本标签推送时触发
+      - 'v*'
   pull_request:
     branches:
       - main
@@ -16,18 +16,19 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        
-    if: github.event_name == 'push' && github.ref_type == 'tag'
+
+    if: startsWith(github.ref, 'refs/tags/v') && github.event.base_ref == 'refs/heads/main'
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      # Install CMake + compiler
-      - name: Install dependencies (Ubuntu)
+      # 安装依赖
+      - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake build-essential
+          sudo apt-get install -y cmake build-essential dpkg-dev
 
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
@@ -40,53 +41,68 @@ jobs:
         run: |
           brew install cmake
 
-      # Standard build (out-of-source)
-      - name: Configure and build (all platforms)
+      # 编译项目
+      - name: Build project
         run: |
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
           cmake --build build --config Release
+        shell: bash
 
-      # Run test: Linux & macOS
+      # 运行测试
       - name: Run tests (Linux & macOS)
         if: runner.os != 'Windows'
         run: ./build/MyCppProject
 
-      # Run test: Windows
       - name: Run tests (Windows)
         if: runner.os == 'Windows'
         run: .\build\Release\MyCppProject.exe
-      
-      # Step: Archive the executable (all platforms)
-      - name: Package executable
+
+      # 打包 Linux `.deb` 文件
+      - name: Package for Linux (Debian)
+        if: runner.os == 'Linux'
         run: |
-          mkdir -p dist
-          if [ "$RUNNER_OS" == "Linux" ]; then
-            cp ./build/MyCppProject ./dist/MyCppProject_Linux
-          elif [ "$RUNNER_OS" == "macOS" ]; then
-            cp ./build/MyCppProject ./dist/MyCppProject_macOS
-          elif [ "$RUNNER_OS" == "Windows" ]; then
-            cp ./build\Release\MyCppProject.exe ./dist/MyCppProject_Windows.exe
-          fi
+          mkdir -p dist/DEBIAN
+          echo "Package: mycppproject" > dist/DEBIAN/control
+          echo "Version: 1.0.0" >> dist/DEBIAN/control
+          echo "Architecture: amd64" >> dist/DEBIAN/control
+          echo "Maintainer: Your Name <you@example.com>" >> dist/DEBIAN/control
+          echo "Description: My C++ Project" >> dist/DEBIAN/control
+          mkdir -p dist/usr/local/bin
+          cp ./build/MyCppProject dist/usr/local/bin/
+          dpkg-deb --build dist mycppproject_1.0.0_amd64.deb
+
+      # 打包 Windows `.exe`
+      - name: Package for Windows
+        if: runner.os == 'Windows'
+        run: |
+          mkdir dist
+          cp ./build/Release/MyCppProject.exe ./dist/MyCppProject_Windows.exe
         shell: bash
 
-      - name: Compress artifacts
-        if: runner.os != 'Windows'
-        run: zip -j dist.zip dist/*
-      - name: Compress artifacts (Windows)
-        if: runner.os == 'Windows'
-        run: powershell Compress-Archive -Path dist\* -DestinationPath dist.zip
+      # 打包 macOS 可执行文件
+      - name: Package for macOS
+        if: runner.os == 'macOS'
+        run: |
+          mkdir dist
+          cp ./build/MyCppProject ./dist/MyCppProject_macOS
+        shell: bash
 
-      # Step: Upload to GitHub Release
+      # 压缩所有发布文件
+      - name: Compress artifacts
+        run: zip -j dist.zip dist/*
+        shell: bash
+
+      # 发布 GitHub Release
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
-        if: github.event_name == 'push' && github.ref_type == 'tag'
+        if: startsWith(github.ref, 'refs/tags/v') && github.event.base_ref == 'refs/heads/main'
         with:
-          tag_name: "release-${{ github.sha }}"   # ✅ 就是这里！
+          tag_name: "${{ github.ref }}"
           name: "Auto Release Build ${{ github.run_number }}"
           draft: false
           prerelease: false
         env:
-          GITHUB_TOKEN: ${{ secrets.MY_PERSONAL_ACCESS_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v1
@@ -94,4 +110,3 @@ jobs:
           files: dist.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
