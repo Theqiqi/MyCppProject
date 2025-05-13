@@ -46,8 +46,8 @@
 
 遇到的错误提示：
 
-```
-vbnetCopyEditerror: failed to push some refs to ...
+```log
+error: failed to push some refs to ...
 hint: Updates were rejected because the tip of your current branch is behind
 ```
 
@@ -75,3 +75,106 @@ git push -u origin main
 ### 4. **修改和更新代码**
 
 每次你修改代码并推送到 GitHub 时，GitHub Actions 会自动运行构建工作流。如果你更新了 GitHub Actions 配置，新的构建流程也会生效。
+
+# 修改文件后需要提交到Git吗?
+
+修改README.md后怎么保存修改以及需要推送到远程吗?
+
+是的，`README.md` 修改后，需要 **保存 → 提交 → 推送** 到远程仓库，流程如下：
+
+------
+
+## ✅ 第一步：保存修改
+
+在编辑器（如 VS Code / Nano / Notepad++）里修改 `README.md` 后，先保存文件。
+
+------
+
+## ✅ 第二步：添加到 Git 暂存区并提交
+
+在终端中进入项目目录，然后执行：
+
+```bash
+git add README.md
+git commit -m "Update README.md"
+```
+
+------
+
+## ✅ 第三步：推送到远程仓库
+
+```bash
+git push origin main
+```
+
+> 🔸 如果你是在 `main` 分支开发，就推送到 `main`，如果是 `master`，就写 `origin master`。
+
+------
+
+## 🔍 检查是否成功
+
+你可以访问你的 GitHub 项目页面，例如：
+
+```lnk
+https://github.com/Theqiqi/MyCppProject
+```
+
+刷新后应能看到你的 `README.md` 改动。
+
+------
+
+如你还有多个修改文件，也可以使用：
+
+```bash
+git add .
+git commit -m "说明你本次修改的内容"
+git push origin main
+```
+
+
+
+## 每次修改都提交岂不是很繁琐?
+
+可以根据实际情况，**灵活控制提交频率** —— 并不是每改一行就提交一次，Git 提交的最佳实践是：
+
+------
+
+### ✅ **推荐做法：一组逻辑改动提交一次**
+
+也就是说：
+
+- 写完一个功能 / 修复完一个 bug / 完成一次说明性改动，就提交一次。
+- 可以对多个文件一起提交。
+- 这样方便你以后查看历史，或者回退。
+
+------
+
+### 📦 示例：多文件一起提交
+
+假设你改了 `main.cpp` 和 `README.md`：
+
+```bash
+git add .
+git commit -m "Add main logic and update README"
+git push origin main
+```
+
+只要你在 **推送（push）之前修改多少次都没问题**，Git 会记录这一次提交的完整快照。
+
+------
+
+### 🧰 如果你懒得频繁提交：
+
+你也可以在一天结束时统一提交：
+
+```bash
+git add .
+git commit -m "Daily update"
+git push origin main
+```
+
+------
+
+### ⚠️ 注意：
+
+**不要养成只改不提交的习惯**，否则容易丢改动（比如系统异常重启、误删等），并且团队协作时容易产生冲突。
