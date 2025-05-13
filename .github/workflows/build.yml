@@ -19,44 +19,36 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      # Set up CMake for Ubuntu
-      - name: Install CMake (Ubuntu)
+      # Install CMake + compiler
+      - name: Install dependencies (Ubuntu)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake build-essential
 
-      # Set up CMake for Windows
-      - name: Install CMake (Windows)
+      - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
         run: |
-          choco install cmake
-          choco install visualstudio2019buildtools
+          choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y
+          choco install visualstudio2019buildtools -y
 
-      # Set up CMake for macOS
-      - name: Install CMake (macOS)
+      - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
           brew install cmake
 
-      # Configure and build the project
-      - name: Configure and build
+      # Standard build (out-of-source)
+      - name: Configure and build (all platforms)
         run: |
-          cmake .
-          cmake --build .
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --config Release
 
-      # Run tests (if applicable)
-      - name: Run tests (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          ./MyCppProject
+      # Run test: Linux & macOS
+      - name: Run tests (Linux & macOS)
+        if: runner.os != 'Windows'
+        run: ./build/MyCppProject
 
+      # Run test: Windows
       - name: Run tests (Windows)
         if: runner.os == 'Windows'
-        run: |
-          .\MyCppProject.exe
-
-      - name: Run tests (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          ./MyCppProject
+        run: .\build\Release\MyCppProject.exe
