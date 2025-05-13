@@ -65,8 +65,10 @@ jobs:
           elif [ "$RUNNER_OS" == "macOS" ]; then
             cp ./build/MyCppProject ./dist/MyCppProject_macOS
           elif [ "$RUNNER_OS" == "Windows" ]; then
-            cp .\build\Release\MyCppProject.exe .\dist\MyCppProject_Windows.exe
+            cp ./build\Release\MyCppProject.exe ./dist/MyCppProject_Windows.exe
           fi
+        shell: bash
+
       - name: Compress artifacts
         if: runner.os != 'Windows'
         run: zip -j dist.zip dist/*
