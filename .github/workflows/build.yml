@@ -5,7 +5,7 @@ on:
     branches:
       - main
     tags:
-      - 'v*'
+      - 'v*'  # 仅在 main 分支上带 v* 版本标签推送时触发
   pull_request:
     branches:
       - main
@@ -17,25 +17,30 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
 
+    # 仅在 tag 推送触发时运行（tag 必须以 v 开头，并且基于 main 分支）
     if: startsWith(github.ref, 'refs/tags/v') && github.event.base_ref == 'refs/heads/main'
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      # 安装依赖
+      # 安装依赖（Linux）
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake build-essential dpkg-dev
 
+      # 安装依赖（Windows）
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
         run: |
-          choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y --force
-          choco install visualstudio2019buildtools -y --force
+          echo "Installing CMake via Chocolatey..."
+          choco install cmake --installargs "ADD_CMAKE_TO_PATH=System" -y --force || (echo "CMake installation failed, please re-run." && exit 1)
+          echo "Installing Visual Studio 2019 Build Tools via Chocolatey..."
+          choco install visualstudio2019buildtools -y --force || (echo "Visual Studio Build Tools installation failed, please re-run." && exit 1)
 
+      # 安装依赖（macOS）
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
@@ -48,16 +53,17 @@ jobs:
           cmake --build build --config Release
         shell: bash
 
-      # 运行测试
+      # 运行测试（Linux 和 macOS）
       - name: Run tests (Linux & macOS)
-        if: runner.os != 'Windows'
+        if: runner.os == 'Linux' || runner.os == 'macOS'
         run: ./build/MyCppProject
 
+      # 运行测试（Windows）
       - name: Run tests (Windows)
         if: runner.os == 'Windows'
         run: .\build\Release\MyCppProject.exe
 
-      # 打包 Linux `.deb` 文件
+      # 打包 Linux （生成 Debian 安装包）
       - name: Package for Linux (Debian)
         if: runner.os == 'Linux'
         run: |
@@ -70,12 +76,13 @@ jobs:
           mkdir -p dist/usr/local/bin
           cp ./build/MyCppProject dist/usr/local/bin/
           dpkg-deb --build dist mycppproject_1.0.0_amd64.deb
+        shell: bash
 
-      # 打包 Windows `.exe`
+      # 打包 Windows 可执行文件
       - name: Package for Windows
         if: runner.os == 'Windows'
         run: |
-          mkdir dist
+          mkdir -p dist
           cp ./build/Release/MyCppProject.exe ./dist/MyCppProject_Windows.exe
         shell: bash
 
@@ -83,20 +90,29 @@ jobs:
       - name: Package for macOS
         if: runner.os == 'macOS'
         run: |
-          mkdir dist
+          mkdir -p dist
           cp ./build/MyCppProject ./dist/MyCppProject_macOS
         shell: bash
 
-      # 确保 dist 目录不为空
+      # 检查 dist 目录下是否有文件
       - name: Check dist directory
-        run: ls -R dist/
-
-      # 压缩所有发布文件
-      - name: Compress artifacts
-        run: zip -j dist.zip dist/*
+        run: |
+          echo "Listing contents of dist directory:"
+          find dist -type f
         shell: bash
 
-      # 发布 GitHub Release
+      # 压缩 dist 目录下的文件（仅当有文件时执行）
+      - name: Compress artifacts
+        run: |
+          file_count=$(find dist -type f | wc -l)
+          if [ $file_count -gt 0 ]; then
+            zip -j artifacts.zip $(find dist -type f)
+          else
+            echo "No files found in dist directory, skipping zipping."
+          fi
+        shell: bash
+
+      # 创建 GitHub Release
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/v') && github.event.base_ref == 'refs/heads/main'
@@ -108,9 +124,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # 上传 Artifact 到 GitHub Release
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v1
         with:
-          files: dist.zip
+          files: artifacts.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
