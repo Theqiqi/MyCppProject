@@ -1,5 +1,4 @@
----
-name: CMake Build & Release
+name: CMake Build
 
 on:
   push:
@@ -7,116 +6,116 @@ on:
       - 'v*'
 
 jobs:
-  # 1) Windows: build、打包并创建 Release
+  # Windows 构建
   build-windows:
     runs-on: windows-latest
+
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
 
       - name: Get version from tag
         id: get_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
-
-      - name: Configure & Build (Windows)
         run: |
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-          cmake --build build --config Release
-        shell: bash
+          echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
 
-      - name: Package Windows ZIP
+      - name: Configure CMake (Windows)
+        run: cmake -B build
+
+      - name: Build (Windows)
+        run: cmake --build build --config Release
+
+      - name: Package (Windows)
         run: |
           mkdir -p dist
           cp build/Release/*.exe dist/
-          7z a MyCppProject-${{ env.VERSION }}-windows_x86_64.zip dist/*
-        shell: bash
+          cd dist
+          7z a ../MyCppProject-${{ env.VERSION }}-windows_x86_64.zip *
 
-      - name: Create GitHub Release & upload Windows asset
+      - name: Upload release asset (Windows)
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref }}
-          name: Release ${{ env.VERSION }}
           files: MyCppProject-${{ env.VERSION }}-windows_x86_64.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-
-  # 2) Linux: build、打包并上传资产
+  # Linux 构建
   build-linux:
-    needs: build-windows
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
       - name: Get version from tag
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
-        shell: bash
-
-      - name: Install packaging tools
-        run: sudo apt-get update && sudo apt-get install -y dpkg-dev p7zip-full
-        shell: bash
-
-      - name: Configure & Build (Linux)
+        id: get_version
         run: |
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-          cmake --build build
-        shell: bash
+          echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
 
-      - name: Create .deb package
+      - name: Configure CMake (Linux)
+        run: cmake -B build
+
+      - name: Build (Linux)
+        run: cmake --build build --config Release
+
+      - name: Package (Linux)
         run: |
-          cmake --install build --prefix dist
-          mkdir -p dist/DEBIAN
-          echo "Package: mycppproject" > dist/DEBIAN/control
-          echo "Version: ${{ env.VERSION }}" >> dist/DEBIAN/control
-          echo "Architecture: amd64" >> dist/DEBIAN/control
-          echo "Maintainer: You <you@example.com>" >> dist/DEBIAN/control
-          echo "Description: My C++ Project" >> dist/DEBIAN/control
-          dpkg-deb --build dist mycppproject_${{ env.VERSION }}_amd64.deb
-        shell: bash
+          mkdir -p dist
+          cp build/Release/*.deb dist/
+          cd dist
+          7z a ../MyCppProject-${{ env.VERSION }}-Linux_deb_x86_64.zip *
 
-      - name: Package Linux ZIP
-        run: 7z a MyCppProject-${{ env.VERSION }}-Linux_deb_x86_64.zip mycppproject_${{ env.VERSION }}_amd64.deb
-        shell: bash
-
-      - name: Upload Linux asset
+      - name: Upload release asset (Linux)
         uses: softprops/action-gh-release@v2
         with:
-          create_release: false
           files: MyCppProject-${{ env.VERSION }}-Linux_deb_x86_64.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-
-  # 3) macOS: build、打包并上传资产
+  # macOS 构建
   build-macos:
-    needs: build-windows
     runs-on: macos-latest
+
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
       - name: Get version from tag
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
-        shell: bash
-
-      - name: Configure & Build (macOS)
+        id: get_version
         run: |
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-          cmake --build build --config Release
-        shell: bash
+          echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
 
-      - name: Package macOS ZIP
+      - name: Configure CMake (macOS)
+        run: cmake -B build
+
+      - name: Build (macOS)
+        run: cmake --build build --config Release
+
+      - name: Package (macOS)
         run: |
           mkdir -p dist
-          cp build/MyCppProject dist/
-          7z a MyCppProject-${{ env.VERSION }}-macOS_x86_64.zip dist/*
-        shell: bash
+          cp build/Release/*.app dist/
+          cd dist
+          7z a ../MyCppProject-${{ env.VERSION }}-macOS_x86_64.zip *
 
-      - name: Upload macOS asset
+      - name: Upload release asset (macOS)
         uses: softprops/action-gh-release@v2
         with:
-          create_release: false
           files: MyCppProject-${{ env.VERSION }}-macOS_x86_64.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
