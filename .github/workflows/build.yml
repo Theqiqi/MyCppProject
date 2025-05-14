@@ -7,14 +7,16 @@ on:
       - 'v*'
 
 jobs:
-  # 1) Windows job creates the release
+  # 1) Windows: build、打包并创建 Release
   build-windows:
     runs-on: windows-latest
-    env:
-      VERSION: ${{ substring(github.ref_name, 1) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Get version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
 
       - name: Configure & Build (Windows)
         run: |
@@ -39,15 +41,17 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 
-  # 2) Linux job just uploads its asset to the existing release
+  # 2) Linux: build、打包并上传资产
   build-linux:
     needs: build-windows
     runs-on: ubuntu-latest
-    env:
-      VERSION: ${{ substring(github.ref_name, 1) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Get version from tag
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+        shell: bash
 
       - name: Install packaging tools
         run: sudo apt-get update && sudo apt-get install -y dpkg-dev p7zip-full
@@ -84,15 +88,17 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 
-  # 3) macOS job just uploads its asset to the existing release
+  # 3) macOS: build、打包并上传资产
   build-macos:
     needs: build-windows
     runs-on: macos-latest
-    env:
-      VERSION: ${{ substring(github.ref_name, 1) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Get version from tag
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+        shell: bash
 
       - name: Configure & Build (macOS)
         run: |
