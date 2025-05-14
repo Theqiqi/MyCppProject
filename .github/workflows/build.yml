@@ -1,133 +1,92 @@
-name: Build C++ Project
-
 on:
   push:
-    branches:
-      - main
-    tags:
-      - 'v*'  # 仅在 main 分支上带 v* 版本标签推送时触发
+    branches: [ main ]
+    tags:    [ 'v*' ]
   pull_request:
-    branches:
-      - main
+    branches: [ main ]
 
 jobs:
-  build:
+  build-and-test:
     runs-on: ${{ matrix.os }}
     strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-
-    # 仅在 tag 推送触发时运行（tag 必须以 v 开头，并且基于 main 分支）
-    if: startsWith(github.ref, 'refs/tags/v') && github.event.base_ref == 'refs/heads/main'
+      matrix: { os: [ubuntu-latest, windows-latest, macos-latest] }
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v2
 
-      # 安装依赖（Linux）
-      - name: Install dependencies (Linux)
+      # [Install deps per-OS]
+      - name: Install deps (Linux)
         if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake build-essential dpkg-dev
-
-      # 安装依赖（Windows）
-      - name: Install dependencies (Windows)
+        run: sudo apt-get update && sudo apt-get install -y cmake build-essential dpkg-dev
+      - name: Install deps (Windows)
         if: runner.os == 'Windows'
+        shell: pwsh
         run: |
-          echo "Installing CMake via Chocolatey..."
-          choco install cmake --installargs "ADD_CMAKE_TO_PATH=System" -y --force || (echo "CMake installation failed, please re-run." && exit 1)
-          echo "Installing Visual Studio 2019 Build Tools via Chocolatey..."
-          choco install visualstudio2019buildtools -y --force || (echo "Visual Studio Build Tools installation failed, please re-run." && exit 1)
-
-      # 安装依赖（macOS）
-      - name: Install dependencies (macOS)
+          choco install cmake --installargs "ADD_CMAKE_TO_PATH=System" -y
+          choco install visualstudio2019buildtools -y
+      - name: Install deps (macOS)
         if: runner.os == 'macOS'
-        run: |
-          brew install cmake
+        run: brew install cmake
 
-      # 编译项目
-      - name: Build project
+      # build & test
+      - name: Build
         run: |
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
           cmake --build build --config Release
-        shell: bash
-
-      # 运行测试（Linux 和 macOS）
-      - name: Run tests (Linux & macOS)
-        if: runner.os == 'Linux' || runner.os == 'macOS'
-        run: ./build/MyCppProject
-
-      # 运行测试（Windows）
-      - name: Run tests (Windows)
-        if: runner.os == 'Windows'
-        run: .\build\Release\MyCppProject.exe
-
-      # 打包 Linux （生成 Debian 安装包）
-      - name: Package for Linux (Debian)
-        if: runner.os == 'Linux'
+      - name: Test
         run: |
-          mkdir -p dist/DEBIAN
-          echo "Package: mycppproject" > dist/DEBIAN/control
-          echo "Version: 1.0.0" >> dist/DEBIAN/control
-          echo "Architecture: amd64" >> dist/DEBIAN/control
-          echo "Maintainer: Your Name <you@example.com>" >> dist/DEBIAN/control
-          echo "Description: My C++ Project" >> dist/DEBIAN/control
-          mkdir -p dist/usr/local/bin
-          cp ./build/MyCppProject dist/usr/local/bin/
-          dpkg-deb --build dist mycppproject_1.0.0_amd64.deb
-        shell: bash
-
-      # 打包 Windows 可执行文件
-      - name: Package for Windows
-        if: runner.os == 'Windows'
-        run: |
-          mkdir -p dist
-          cp ./build/Release/MyCppProject.exe ./dist/MyCppProject_Windows.exe
-        shell: bash
-
-      # 打包 macOS 可执行文件
-      - name: Package for macOS
-        if: runner.os == 'macOS'
-        run: |
-          mkdir -p dist
-          cp ./build/MyCppProject ./dist/MyCppProject_macOS
-        shell: bash
-
-      # 检查 dist 目录下是否有文件
-      - name: Check dist directory
-        run: |
-          echo "Listing contents of dist directory:"
-          find dist -type f
-        shell: bash
-
-      # 压缩 dist 目录下的文件（仅当有文件时执行）
-      - name: Compress artifacts
-        run: |
-          file_count=$(find dist -type f | wc -l)
-          if [ $file_count -gt 0 ]; then
-            zip -j artifacts.zip $(find dist -type f)
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            .\build\Release\MyCppProject.exe
           else
-            echo "No files found in dist directory, skipping zipping."
+            ./build/MyCppProject
           fi
         shell: bash
 
-      # 创建 GitHub Release
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/v') && github.event.base_ref == 'refs/heads/main'
+      # upload raw artifacts for diagnostics
+      - uses: actions/upload-artifact@v3
         with:
-          tag_name: "${{ github.ref }}"
-          name: "Auto Release Build ${{ github.run_number }}"
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: raw-binaries-${{ runner.os }}
+          path: build/**
 
-      # 上传 Artifact 到 GitHub Release
-      - name: Upload Release Asset
+  release:
+    needs: build-and-test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ github.ref_name#'v' }}
+    steps:
+      - uses: actions/checkout@v2
+
+      # re-build & install into dist
+      - name: Install & Build into dist
+        run: |
+          cmake -S . -B build -DCMAKE_INSTALL_PREFIX=dist -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --target install --config Release
+
+      - name: Package Debian
+        run: |
+          cat > dist/DEBIAN/control <<EOF
+          Package: mycppproject
+          Version: ${VERSION}
+          Architecture: amd64
+          Maintainer: You <you@example.com>
+          Description: My C++ Project
+          EOF
+          dpkg-deb --build dist mycppproject_${VERSION}_amd64.deb
+
+      - name: Zip macOS & Windows
+        run: |
+          zip -j dist-macos.zip dist/usr/local/bin/MyCppProject
+          zip -j dist-windows.zip build/Release/MyCppProject.exe
+
+      - name: Create GitHub Release & upload assets
         uses: softprops/action-gh-release@v1
         with:
-          files: artifacts.zip
+          tag_name: ${{ github.ref }}
+          name: Release ${{ env.VERSION }}
+          files: |
+            mycppproject_${VERSION}_amd64.deb
+            dist-macos.zip
+            dist-windows.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
