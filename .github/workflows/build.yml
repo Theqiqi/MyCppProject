@@ -1,123 +1,45 @@
-name: Build C++ Project
+---
+name: CMake Build
 
 on:
   push:
-    branches:
-      - main
     tags:
       - 'v*'
-  pull_request:
-    branches:
-      - main
 
 jobs:
-  build-and-test:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+  build:
+    runs-on: windows-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Install dependencies (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake build-essential dpkg-dev
-
-      - name: Install dependencies (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          choco install cmake --installargs "ADD_CMAKE_TO_PATH=System" -y
-          choco install visualstudio2019buildtools -y
-
-      - name: Install dependencies (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          brew update
-          brew install cmake
-
-      - name: Build project
-        run: |
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-          cmake --build build --config Release
-        shell: bash
-
-      - name: Run tests
-        run: |
-          if [ "${{ runner.os }}" == "Windows" ]; then
-            .\build\Release\MyCppProject.exe
-          else
-            ./build/MyCppProject
-          fi
-        shell: bash
-
-      - name: Upload raw binaries
-        uses: actions/upload-artifact@v3
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          name: raw-binaries-${{ matrix.os }}
-          path: build/**
+          python-version: '3.x'
 
-  release:
-    needs: build-and-test
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    env:
-      # Strip leading "v" from tag name, e.g. "v1.2.3" → "1.2.3"
-      VERSION: ${{ substring(github.ref_name, 1) }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Download Linux build artifacts
-        uses: actions/download-artifact@v3
-        with:
-          name: raw-binaries-ubuntu-latest
-
-      - name: Download Windows build artifacts
-        uses: actions/download-artifact@v3
-        with:
-          name: raw-binaries-windows-latest
-
-      - name: Download macOS build artifacts
-        uses: actions/download-artifact@v3
-        with:
-          name: raw-binaries-macos-latest
-
-      - name: Package Debian (.deb)
+      - name: Get version from tag
+        id: get_version
         run: |
-          mkdir -p dist/DEBIAN
-          cat > dist/DEBIAN/control <<EOF
-          Package: mycppproject
-          Version: ${VERSION}
-          Architecture: amd64
-          Maintainer: Your Name <you@example.com>
-          Description: My C++ Project
-          EOF
-          mkdir -p dist/usr/local/bin
-          cp raw-binaries-ubuntu-latest/MyCppProject dist/usr/local/bin/
-          dpkg-deb --build dist mycppproject_${VERSION}_amd64.deb
+          echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
 
-      - name: Package Windows ZIP
+      - name: Configure CMake
+        run: cmake -B build
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Package
         run: |
-          zip -j mycppproject-${VERSION}-windows.zip raw-binaries-windows-latest/Release/MyCppProject.exe
+          mkdir -p dist
+          cp build/Release/*.exe dist/
+          cd dist
+          7z a ../MyCppProject-${{ env.VERSION }}.zip *
 
-      - name: Package macOS ZIP
-        run: |
-          zip -j mycppproject-${VERSION}-macos.zip raw-binaries-macos-latest/MyCppProject
-
-      - name: Create GitHub Release & upload assets
-        uses: softprops/action-gh-release@v1
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref }}
-          name: Release ${{ env.VERSION }}
-          files: |
-            mycppproject_${VERSION}_amd64.deb
-            mycppproject-${VERSION}-windows.zip
-            mycppproject-${VERSION}-macos.zip
+          files: MyCppProject-${{ env.VERSION }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
