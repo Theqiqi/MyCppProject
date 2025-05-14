@@ -1,4 +1,3 @@
-# yamllint disable: truthy,line-length
 ---
 name: CMake Build & Release
 
@@ -8,60 +7,57 @@ on:
       - 'v*'
 
 jobs:
-  # Windows build & release
+  # 1) Windows job creates the release
   build-windows:
     runs-on: windows-latest
+    env:
+      VERSION: ${{ substring(github.ref_name, 1) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Get version
-        id: version_win
-        run: |
-          echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
 
       - name: Configure & Build (Windows)
         run: |
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
           cmake --build build --config Release
+        shell: bash
 
       - name: Package Windows ZIP
         run: |
           mkdir -p dist
           cp build/Release/*.exe dist/
-          7z a \
-            MyCppProject-${{ env.VERSION }}-windows_x86_64.zip \
-            dist/*
+          7z a MyCppProject-${{ env.VERSION }}-windows_x86_64.zip dist/*
+        shell: bash
 
-      - name: Upload Windows asset
+      - name: Create GitHub Release & upload Windows asset
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.ref }}
+          name: Release ${{ env.VERSION }}
           files: MyCppProject-${{ env.VERSION }}-windows_x86_64.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 
-  # Linux build & release
+  # 2) Linux job just uploads its asset to the existing release
   build-linux:
+    needs: build-windows
     runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ substring(github.ref_name, 1) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Get version
-        id: version_linux
-        run: |
-          echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
-
       - name: Install packaging tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y dpkg-dev p7zip-full
+        run: sudo apt-get update && sudo apt-get install -y dpkg-dev p7zip-full
+        shell: bash
 
       - name: Configure & Build (Linux)
         run: |
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
           cmake --build build
+        shell: bash
 
       - name: Create .deb package
         run: |
@@ -72,51 +68,49 @@ jobs:
           echo "Architecture: amd64" >> dist/DEBIAN/control
           echo "Maintainer: You <you@example.com>" >> dist/DEBIAN/control
           echo "Description: My C++ Project" >> dist/DEBIAN/control
-          dpkg-deb --build dist \
-            mycppproject_${{ env.VERSION }}_amd64.deb
+          dpkg-deb --build dist mycppproject_${{ env.VERSION }}_amd64.deb
+        shell: bash
 
       - name: Package Linux ZIP
-        run: |
-          7z a \
-            MyCppProject-${{ env.VERSION }}-Linux_deb_x86_64.zip \
-            mycppproject_${{ env.VERSION }}_amd64.deb
+        run: 7z a MyCppProject-${{ env.VERSION }}-Linux_deb_x86_64.zip mycppproject_${{ env.VERSION }}_amd64.deb
+        shell: bash
 
       - name: Upload Linux asset
         uses: softprops/action-gh-release@v2
         with:
+          create_release: false
           files: MyCppProject-${{ env.VERSION }}-Linux_deb_x86_64.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 
-  # macOS build & release
+  # 3) macOS job just uploads its asset to the existing release
   build-macos:
+    needs: build-windows
     runs-on: macos-latest
+    env:
+      VERSION: ${{ substring(github.ref_name, 1) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Get version
-        id: version_mac
-        run: |
-          echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
 
       - name: Configure & Build (macOS)
         run: |
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
           cmake --build build --config Release
+        shell: bash
 
       - name: Package macOS ZIP
         run: |
           mkdir -p dist
           cp build/MyCppProject dist/
-          7z a \
-            MyCppProject-${{ env.VERSION }}-macOS_x86_64.zip \
-            dist/*
+          7z a MyCppProject-${{ env.VERSION }}-macOS_x86_64.zip dist/*
+        shell: bash
 
       - name: Upload macOS asset
         uses: softprops/action-gh-release@v2
         with:
+          create_release: false
           files: MyCppProject-${{ env.VERSION }}-macOS_x86_64.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
