@@ -1,4 +1,3 @@
----
 name: CMake Build
 
 on:
@@ -7,7 +6,8 @@ on:
       - 'v*'
 
 jobs:
-  build:
+  # Windows 构建
+  build-windows:
     runs-on: windows-latest
 
     steps:
@@ -24,22 +24,98 @@ jobs:
         run: |
           echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
 
-      - name: Configure CMake
+      - name: Configure CMake (Windows)
         run: cmake -B build
 
-      - name: Build
+      - name: Build (Windows)
         run: cmake --build build --config Release
 
-      - name: Package
+      - name: Package (Windows)
         run: |
           mkdir -p dist
           cp build/Release/*.exe dist/
           cd dist
-          7z a ../MyCppProject-${{ env.VERSION }}.zip *
+          7z a ../MyCppProject-${{ env.VERSION }}-windows_x86_64.zip *
 
-      - name: Upload release asset
+      - name: Upload release asset (Windows)
         uses: softprops/action-gh-release@v2
         with:
-          files: MyCppProject-${{ env.VERSION }}.zip
+          files: MyCppProject-${{ env.VERSION }}-windows_x86_64.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Linux 构建
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Get version from tag
+        id: get_version
+        run: |
+          echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+
+      - name: Configure CMake (Linux)
+        run: cmake -B build
+
+      - name: Build (Linux)
+        run: cmake --build build --config Release
+
+      - name: Package (Linux)
+        run: |
+          mkdir -p dist
+          cp build/Release/*.deb dist/
+          cd dist
+          7z a ../MyCppProject-${{ env.VERSION }}-Linux_deb_x86_64.zip *
+
+      - name: Upload release asset (Linux)
+        uses: softprops/action-gh-release@v2
+        with:
+          files: MyCppProject-${{ env.VERSION }}-Linux_deb_x86_64.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # macOS 构建
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Get version from tag
+        id: get_version
+        run: |
+          echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+
+      - name: Configure CMake (macOS)
+        run: cmake -B build
+
+      - name: Build (macOS)
+        run: cmake --build build --config Release
+
+      - name: Package (macOS)
+        run: |
+          mkdir -p dist
+          cp build/Release/*.app dist/
+          cd dist
+          7z a ../MyCppProject-${{ env.VERSION }}-macOS_x86_64.zip *
+
+      - name: Upload release asset (macOS)
+        uses: softprops/action-gh-release@v2
+        with:
+          files: MyCppProject-${{ env.VERSION }}-macOS_x86_64.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
